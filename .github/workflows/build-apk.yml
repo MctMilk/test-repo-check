@@ -17,20 +17,32 @@ jobs:
           distribution: 'temurin'
           
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        
-      - name: Install NDK
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;23.1.7779620" 2>&1 | tail -5
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          mv cmdline-tools latest
+          echo "SDK tools installed"
+          yes | latest/bin/sdkmanager --licenses > /dev/null 2>&1
+          latest/bin/sdkmanager --install "platforms;android-28" "build-tools;28.0.3" "ndk;21.4.7075529" 2>&1 | tail -5
+          echo "SDK components installed"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529" >> $GITHUB_ENV
 
-      - name: Build
+      - name: Build with full output
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon 2>&1 | tail -30
+          ./gradlew clean assembleDebug --no-daemon 2>&1 | tee /tmp/build_output.txt
+          echo "===BUILD DONE==="
+          find . -name "*.apk" -type f 2>/dev/null
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: wireless-display-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            /tmp/build_output.txt
